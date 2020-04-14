@@ -390,6 +390,64 @@ sudo systemctl restart nginx
 
 
 
+## Setting Up Your Projects
+
+So now, we have the environments that allow our code to run set up. Our web server is configured and ready. All we need is to setup our actual projects on our virtual machine. This is the easy part, hopefully you already have your repositories somewhere on GitHub or GitLab.  
+
+### Setting Up GitHub Permissions for Your Server
+
+Since you will be pulling new changes often, it is a hassle to provide your GitHub credentials every time you pull. So just like how you SSH into your server with your keys instead of credentials, let's create an SSH key pair on our server and tell GitHub to allow our Server's public key so it doesn't need to authenticate every time.  You will only do this step once.
+
+``` bash
+ssh-keygen # To Create SSH Key Pairs on your server
+cd /home/YourUserName/.ssh/id_rsa.pub # Display your public key to your terminal
+```
+
+Copy your Key and go to your [GitHub Settings](https://github.com/settings/keys) and click on **SSH and GPG keys** > **New SSH key**. Paste your key into the **key** text area and give it whatever title you want. Now your server should be able to authenticate via SSH key instead of having to login every time !
+
+### Setting Up Your Backend Project
+
+In the configuration file for our API, we specified a root directory for our project so we better create it in the same path we told Nginx it will be in, pull our code files, and install any libraries we are using so it can run.
+
+``` bash
+# Go to your web server's root directory
+cd /var/www/html 
+# Create your project's folder with same name as the one you specified in api.somesite.conf
+mkdir somesite-api 
+# Link the folder to your repository and pull your code
+git init
+git remote add origin git@github.com:YouGitHubUserName:YourProjectName.git
+git pull origin master
+# Install all PHP library dependencies our project uses
+composer install
+```
+
+Now, our code will run smoothly, but do not forget to change the database credentials your using in your code to match the ones on the server. *(Set them as environment variables or in the ```.env``` file for Laravel. Just never include them in your actual code as it is dangerous.)*
+
+### Setting Up Your Frontend Project
+
+Just like our API project, we need to create the directory we promised Nginx our code will be in, pull our code, install any dependencies and build our project.
+
+``` bash
+# Go to your web server's root directory
+cd /var/www/html 
+# Create your project's folder with same name as the one you specified in api.somesite.conf
+mkdir somesite-web 
+# Link the folder to your repository and pull your code
+git init
+git remote add origin git@github.com:YouGitHubUserName:YourProjectName.git
+git pull origin master
+# Install all JavaScript library dependencies our project uses
+npm install
+# Build our project.
+# This applies to modern JavaScript applications. You often need to run a build command that essentially compile the advanced JavaScript syntax you use into simple JavaScript browsers understand, minifies resources like JavaScript files and CSS Files, etc.
+# Our React template has a script set to run that does this building process called 'build'. So to run it, we will need to tell npm to run a script called 'build'. Which is done by saying:
+npm run build
+# My build script creates a build/ folder with the final version of html and simplified CSS / JS. Which is why in somesite.conf we defined the root to go to this build/ folder. If your files are built into a different folder like 'public/' or something like that you need to change the *root* directive in the Nginx conf file to match your case. 
+```
+
+
+
 
 ## Allow Online Traffic
 
@@ -429,3 +487,47 @@ You can check what is being allowed on your firewall at any time by running:
 ``` bash
  ufw status
 ```
+
+
+
+## Setting Up Your Domain & Sub Domains
+
+By now, you probably have you web app working fine when you enter your server's IP in your browser. But people won't ever get to that application with an IP.  Your client is eager to type his new business' domain and see his brand new site. So how can I make the internet map a domain name to my application ? 
+
+### Buying a Domain
+
+First off, you need to own the domain. You can buy a domain from countless sites like [GoDaddy](https://ae.godaddy.com/domains/domain-name-search?isc=jodomUSD1&currencyType=USD&gclid=CjwKCAjwvtX0BRAFEiwAGWJyZPSiV4wdGXcWJutsDzidUV7zfrqDU_5qbi44i4juet6l-99zKK8LexoCIkMQAvD_BwE&gclsrc=aw.ds) 
+
+### Configuring Name Servers
+
+At some point, you want to tell GoDaddy that I want any requests to this domain to go to my cloud provider where my virtual machine exists. To do that, GoDaddy will allow you to edit your domain's **name servers**. Usually cloud providers provide 3 name servers you need to map your domains to, in the case for digital ocean, these name servers are:
+
+- ns1.digitalocean.com
+- ns2.digitalocean.com
+- ns3.digitalocean.com
+
+### Registering Your Domain to Your Cloud Provider
+
+So now, requests to our domain will be forwarded to Digital Ocean. But Digital Ocean has no clue its our domain, so we need to register it in from our [Dashboard](https://cloud.digitalocean.com/). Go to Networking > Domains and add a new domain. By default you will notice they already have 3 NS records. 
+
+### Adding Records for the Domain & Subdomain
+
+So now Digital Ocean knows to wait for any calls to your domain. But where should it send these calls to ? The next step is to add some records to point that out.
+
+- Add an **A Record**, Hostname = somesite.com, Value = YourServersIPAddress
+
+  *This route is for our web project. This will tell Digital Ocean that any web request to this domain should be forwarded to your virtual machine. After it gets to your virtual machine, Nginx was configured to handle it from that point and serve our React Website*
+
+- Add another A Record, Hostname = api.somesite.com, Value = YourServersIPAddress
+
+  *This route is for our API project.* Notice how adding a subdomain for our API project is as simple as just adding an **A Record**.
+
+- Add a **CNAME Record**, Hostname = www.somesite.com, Value = somesite.com
+
+  *This will tell Digital Ocean that www.somesite.com is the same as somesite.com*
+
+  
+
+  **Note**: Notice how both somesite.com & api.somesite.com point to the same IP yet end up referring to different projects. Nginx was able to handle that because of the ```server_name``` directive in both ```.conf``` files we wrote for our projects. server block that had ```server_name api.somesite.com``` had all our API project root and info. Similarly, the server block that had ```server_name somesite.com``` had our React project's root and info. 
+
+Now give it some time and the mapping should take effect in up to 15 minutes. 
