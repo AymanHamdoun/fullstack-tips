@@ -490,4 +490,4 @@ You can check what is being allowed on your firewall at any time by running:
 
 
 
-By now, you have everything from server config to code up and running and just need to link a domain and API subdomain to your virtual machine. I will setup a guide to everything you might want to do in that regard in [This Document](https://github.com/AymanHamdoun/fullstack-tips/domains-ssl-emails.md).
+By now, you have a web server on a machine that has your database, API project and Web Project. All you need now is to map a domain name to your website, and some subdomain to your API for your web project to call. And since its the standard these days, you will also want these to be encrypted in SSL so your client can be happy with the little security icon in the browser, Maybe even make some emails that are support@yourdomain.com so your client can brag about it. I will make a guide on this later.
