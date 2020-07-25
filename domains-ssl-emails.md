@@ -1,4 +1,4 @@
-# Domains, Subdomains, SSL & Emails
+# Domains, SSL & Emails
 
 ## Setting Up Your Domain
 
@@ -8,51 +8,112 @@ By now, you probably have you web app working fine when you enter your server's 
 
 First off, you need to own the domain. You can buy a domain from countless sites like [GoDaddy](https://ae.godaddy.com/domains/domain-name-search?isc=jodomUSD1&currencyType=USD&gclid=CjwKCAjwvtX0BRAFEiwAGWJyZPSiV4wdGXcWJutsDzidUV7zfrqDU_5qbi44i4juet6l-99zKK8LexoCIkMQAvD_BwE&gclsrc=aw.ds) 
 
-### Configuring Name Servers
-
-At some point, you want to tell GoDaddy that I want any requests to this domain to go to my cloud provider where my virtual machine exists. To do that, GoDaddy will allow you to edit your domain's **name servers**. Usually cloud providers provide 3 name servers you need to map your domains to, in the case for digital ocean, these name servers are:
-
-- ns1.digitalocean.com
-- ns2.digitalocean.com
-- ns3.digitalocean.com
-
 ### Registering Your Domain to Your Cloud Provider
 
-So now, requests to our domain will be forwarded to Digital Ocean. But Digital Ocean has no clue its our domain, so we need to register it in from our [Dashboard](https://cloud.digitalocean.com/). Go to Networking > Domains and add a new domain. By default you will notice they already have 3 NS records. 
+Digital Ocean still has no clue we have a domain, so we need to register it in from our [Dashboard](https://cloud.digitalocean.com/). Go to Networking > Domains and add a new domain. 
 
-### Adding Records for the Domain & Subdomain
+### Adding Records for the Domains / Subdomains
 
-So now Digital Ocean knows to wait for any calls to your domain. But where should it send these calls to ? The next step is to add some records to point that out.
+What you need to know to play around with linking domains & subdomains to servers is that when you buy a domain, you can set certain rules & mappings to it for the rest of the internet to acknowledge. These *rules* are called records, and these are the type of records you should concern yourself with to setup your domain.
 
-- Add an **A Record**, Hostname = somesite.com, Value = YourServersIPAddress
-
-  *This route is for our web project. This will tell Digital Ocean that any web request to this domain should be forwarded to your virtual machine. After it gets to your virtual machine, Nginx was configured to handle it from that point and serve our React Website*
-
-- Add a **CNAME Record**, Hostname = www.somesite.com, Value = somesite.com
-
-  *This will tell Digital Ocean that www.somesite.com is the same as somesite.com*
-
-  
-
-## Setting Up Subdomains
-
-Add another A Record, Hostname = api.somesite.com, Value = YourServersIPAddress
-
-*This route is for our API project.* Notice how adding a subdomain for our API project is as simple as just adding an **A Record**.
-
-**Note**: Notice how both somesite.com & api.somesite.com point to the same IP yet end up referring to different projects. Nginx was able to handle that because of the ```server_name``` directive in both ```.conf``` files we wrote for our projects. server block that had ```server_name api.somesite.com``` had all our API project root and info. Similarly, the server block that had ```server_name somesite.com``` had our React project's root and info. 
-
-Now give it some time and the mapping should take effect in up to 15 minutes. 
+| Record Type | Record Value         | Description                                               |
+| ----------- | -------------------- | --------------------------------------------------------- |
+| A           | an IP address        | an IP address your domain should redirect to              |
+| CNAME       | a domain / subdomain | another domain / subdomain your domain should redirect to |
+| NS          | a domain             | The domain of the name server of your cloud provider.     |
 
 
 
-## Setting Up SSL (https)
+So what we need to do is the following 
 
-// write certbot stuff here
+- Tell whoever we baught our domain from to forward the traffic to our cloud provider by adding NS records that point to our cloud provider's name servers. In our case we need 3 NS records pointint to 
+  - <yourdomain.com> -> <ns1.digitalocean.com>
+  - <yourdomain.com> -> <ns2.digitalocean.com>
+  - <yourdomain.com> -> <ns3.digitalocean.com>
+- Tell our cloud provider to forward traffic to our domain to our specific virtual machine by adding an A record. 
+  - <domain-subdomain> -> <IP of your virtual machine>
 
 
 
-## Setting Up Domain Emails
+After this your are basically done. However we can top it off by doing som extra mappings to be more professional like 
 
-// figure it out and note it down here
+- Saying www.mydomain.com is the same as mydomain.com by adding a CNAME record.
+  - <www.mydomain.com> -> is an alias of <mydomain.com>
+
+
+
+Note that changin NS records are usually done from the place you purchased the domain while everything else is done from your cloud provider's dashboard.
+
+
+
+## Adding SSL / HTTPS to Domains
+
+To enable ssl / https you will need an ssl certificate installed on your virtual machine and read by your webserver as it listens to port 443. 
+
+an ssl certificate is made up of a pair of public & private keys. You can get a certificate from multiple places, the most popular place is from [LetsEncrypt](https://letsencrypt.org/). 
+
+You would be pleased to know this process is very easy as LetsEncrypt provides us with [certbot](https://certbot.eff.org/) that can automatically download and add the necessary configurations to our web server config files. All you need to do is ssh into your server and do the following
+
+``` bash
+# Add the certbot repository to your system
+sudo apt-get update
+sudo apt-get install software-properties-common
+sudo add-apt-repository universe
+sudo add-apt-repository ppa:certbot/certbot
+sudo apt-get update
+
+# Install certbot 
+sudo apt-get install certbot python3-certbot-nginx
+```
+
+And to enable ssl on a certain domain (since your server might have several websites on it) you can simply run:
+
+``` bash
+sudo certbot certonly -d thedomain.com
+```
+
+if you don't specify the ``` --nginx``` flag it will ask you what webserver you want to use.
+
+When it finishes you will see something like this:
+
+``` bash
+IMPORTANT NOTES:
+ - Congratulations! Your certificate and chain have been saved at:
+   /etc/letsencrypt/live/yourdomain.com/fullchain.pem
+   Your key file has been saved at:
+   /etc/letsencrypt/live/yourdomain.com/privkey.pem
+   Your cert will expire on 2020-10-23. To obtain a new or tweaked
+   version of this certificate in the future, simply run certbot
+   again. To non-interactively renew *all* of your certificates, run
+   "certbot renew"
+ - If you like Certbot, please consider supporting our work by:
+
+   Donating to ISRG / Let's Encrypt:   https://letsencrypt.org/donate
+   Donating to EFF:                    https://eff.org/donate-le
+
+```
+
+Note the paths it gave you for the public and private keys for the domain you registered.
+
+
+
+**Note:** By now it should have worked.  In the case where certbot failed to edit your nginx .conf file on its own, you can enable ssl from your .conf file manually by adding this piece of code in your server block:
+
+``` conf
+    listen 443 ssl; # managed by Certbot
+    
+    ssl_certificate path-to-fullchain.pem; # managed by Certbot
+    
+    ssl_certificate_key path-to-privkey.pem; # managed by Certbot
+    
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+```
+
+Make sure to replace ``` path-to-fullchain.pem``` with the path to your public letsencrypt key and ``` path-to-privkey``` to your private letsencrypt key.
+
+
+
+## Creating Domain Emails
 
