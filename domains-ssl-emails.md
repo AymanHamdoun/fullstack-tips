@@ -114,6 +114,52 @@ Note the paths it gave you for the public and private keys for the domain you re
 Make sure to replace ``` path-to-fullchain.pem``` with the path to your public letsencrypt key and ``` path-to-privkey``` to your private letsencrypt key.
 
 
+### Nginx file SSL snippet 
+
+``` 
+server {
+
+    index index.php;
+
+    server_name domain.com;
+
+    ssl_stapling on;
+    ssl_stapling_verify on;
+
+    # Pass request to port where the app runs, in this case 8080
+    location / {
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_pass http://0.0.0.0:8080;
+    }
+
+    gzip on;
+    charset utf-8;
+
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/domain.com/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/domain.com/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+
+
+server {
+    if ($host = domain.com) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+
+    server_name domain.com
+    listen 80;
+    return 404; # managed by Certbot
+
+
+```
+
 
 ## Creating Domain Emails
 
